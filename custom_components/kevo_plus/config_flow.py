@@ -1,5 +1,7 @@
 """Config flow for Kevo Plus integration."""
+
 from __future__ import annotations
+
 import hashlib
 import logging
 import uuid
@@ -8,17 +10,16 @@ from typing import Any
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-from aiokevoplus import KevoApi, KevoAuthError, KevoError
+from custom_components.kevo_plus.aiokevoplus import KevoApi, KevoAuthError, KevoError
+
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
 from .const import CONF_LOCKS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-
 STEP_USER_DATA_SCHEMA = vol.Schema({
     vol.Required(CONF_USERNAME): str,
     vol.Required(CONF_PASSWORD): str,
@@ -26,7 +27,6 @@ STEP_USER_DATA_SCHEMA = vol.Schema({
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Kevo Plus."""
-
     VERSION = 1
 
     def __init__(self) -> None:
@@ -35,9 +35,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._api: KevoApi = None
         self._locks = None
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle the initial step."""
         if user_input is None:
             return self.async_show_form(
@@ -60,7 +58,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             await self.hass.async_add_executor_job(
                 self._api.login, user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
             )
-            # Similarly, offload get_locks() to the executor.
+            # Offload get_locks() to the executor.
             locks = await self.hass.async_add_executor_job(self._api.get_locks)
             self._locks = {lock.lock_id: lock.name for lock in locks}
             self.data = user_input

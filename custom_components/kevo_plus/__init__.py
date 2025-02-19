@@ -1,5 +1,7 @@
 """The Kevo Plus integration."""
+
 from __future__ import annotations
+
 import asyncio
 import hashlib
 import logging
@@ -7,29 +9,22 @@ import uuid
 import ssl
 from datetime import timedelta
 
-from aiokevoplus import KevoApi, KevoLock, KevoError, KevoAuthError
+# Updated import: use our local vendored copy.
+from custom_components.kevo_plus.aiokevoplus import KevoApi, KevoLock, KevoError, KevoAuthError
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    CONF_PASSWORD,
-    CONF_USERNAME,
-    EVENT_HOMEASSISTANT_STOP,
-    Platform,
-)
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-
 from .const import CONF_LOCKS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-
 PLATFORMS: list[Platform] = [Platform.LOCK, Platform.SENSOR]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Kevo Plus from a config entry."""
     hass.data.setdefault(DOMAIN, {})
-
     password = entry.data.get(CONF_PASSWORD)
     device_id = uuid.UUID(bytes=hashlib.md5(password.encode()).digest())
 
@@ -39,8 +34,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return KevoApi(device_id, ssl_context=ssl_context)
 
     client = await hass.async_add_executor_job(create_api_client)
-
     try:
+        # Offload blocking login call.
         await hass.async_add_executor_job(
             client.login, entry.data.get(CONF_USERNAME), password
         )
@@ -50,19 +45,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady("Error connecting to Kevo server") from ex
 
     locks = entry.options.get(CONF_LOCKS) or entry.data.get(CONF_LOCKS)
-
     coordinator = KevoCoordinator(hass, client, entry, locks)
-
     try:
         await coordinator.async_refresh()
     except Exception as ex:
         raise ConfigEntryNotReady("Failed to get Kevo devices") from ex
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
-
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    entry.async_on_unload(entry.add_update_listener(update_listener))
 
     async def _async_disconnect(event: Event) -> None:
         """Disconnect from Websocket."""
